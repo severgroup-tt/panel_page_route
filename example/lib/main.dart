@@ -12,15 +12,16 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
+//      home: MyHomePage(title: 'Flutter Demo Home Page'),
+      onGenerateRoute: (settings) => PanelPageRoute(builder: (context) => MyHomePage(pageNumber: 0)),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
+  MyHomePage({Key key, this.pageNumber}) : super(key: key);
 
-  final String title;
+  final int pageNumber;
 
   @override
   _MyHomePageState createState() => _MyHomePageState();
@@ -30,7 +31,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _onFabClick() {
     Navigator.of(context).push(
-      PanelPageRoute(builder: (context) => MyHomePage(title: "Next page")),
+      PanelPageRoute(builder: (context) => MyHomePage(pageNumber: widget.pageNumber + 1), isPopup: true),
     );
   }
 
@@ -38,17 +39,14 @@ class _MyHomePageState extends State<MyHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
+        title: Text("Hey"),
       ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              widget.title,
+              "Page number ${widget.pageNumber}",
               style: Theme.of(context).textTheme.display1,
             ),
           ],
@@ -56,6 +54,7 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _onFabClick,
+
         tooltip: 'Increment',
         child: Icon(Icons.add),
       ),

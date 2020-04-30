@@ -97,6 +97,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
   PanelPageRoute({
     @required this.builder,
     this.title,
+    this.isPopup = false,
     RouteSettings settings,
     this.maintainState = true,
     bool fullscreenDialog = false,
@@ -116,6 +117,8 @@ class PanelPageRoute<T> extends PageRoute<T> {
   /// one is not manually supplied.
   final String title;
 
+  final bool isPopup;
+  
   ValueNotifier<String> _previousTitle;
 
   /// The title string of the previous [PanelPageRoute].
@@ -244,15 +247,17 @@ class PanelPageRoute<T> extends PageRoute<T> {
 
   @override
   Widget buildPage(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation) {
-    final Widget child = SafeArea(
-      child: ClipRRect(
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
-        child: builder(context),
-      ),
-    );
+    final Widget child = isPopup
+      ? SafeArea(
+          child: ClipRRect(
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+            child: builder(context),
+          ),
+        )
+      : builder(context);
 
     final Widget result = Semantics(
       scopesRoute: true,
@@ -304,6 +309,8 @@ class PanelPageRoute<T> extends PageRoute<T> {
       Animation<double> secondaryAnimation,
       Widget child,
       ) {
+    print("---> buildPageTransitions(): route is $route, child is $child");
+
     if (route.fullscreenDialog) {
       return CupertinoFullscreenDialogTransition(
         animation: animation,
@@ -409,14 +416,17 @@ class PanelPageTransition extends StatelessWidget {
 //      textDirection: textDirection,
 //      transformHitTests: false,
 //      child:
-      return SlideTransition(
+    return ColorFiltered(
+      colorFilter: ColorFilter.mode(_secondaryPositionAnimation.value, BlendMode.srcOver),
+      child: SlideTransition(
         position: _primaryPositionAnimation,
         textDirection: textDirection,
-        child:
-        ColorFiltered(
-          colorFilter: ColorFilter.mode(_secondaryPositionAnimation.value, BlendMode.srcOver),
-          child: child,
-        )
+//          child:
+//          ColorFiltered(
+//            colorFilter: ColorFilter.mode(_secondaryPositionAnimation.value, BlendMode.srcOver),
+        child: child,
+//          )
+      ),
     );
   }
 }
