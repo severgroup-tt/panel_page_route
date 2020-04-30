@@ -249,6 +249,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
   Widget buildPage(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation) {
     final Widget child = isPopup
       ? SafeArea(
+          bottom: false,
           child: ClipRRect(
             borderRadius: BorderRadius.only(
               topLeft: Radius.circular(20),
