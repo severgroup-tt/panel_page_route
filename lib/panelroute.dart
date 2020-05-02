@@ -37,33 +37,6 @@ final Animatable<Color> _kMiddleLeftTween = ColorTween(
   begin: Colors.transparent,
   end: Colors.black,
 );
-//Tween<Offset>(
-//  begin: Offset.zero,
-//  end: const Offset(0.0, -1.0/3.0),
-//);
-
-// Custom decoration from no shadow to page shadow mimicking iOS page
-// transitions using gradients.
-final DecorationTween _kGradientShadowTween = DecorationTween(
-  begin: BoxDecoration(color: Colors.transparent),
-//  _PanelEdgeShadowDecoration.none, // No decoration initially.
-  end: BoxDecoration(color: Colors.black),
-//  const _PanelEdgeShadowDecoration(
-//    edgeGradient: LinearGradient(
-//       Spans 5% of the page.
-//      begin: AlignmentDirectional(0.90, 0.0),
-//      end: AlignmentDirectional.centerEnd,
-//       Eyeballed gradient used to mimic a drop shadow on the start side only.
-//      colors: <Color>[
-//        Color(0x00000000),
-//        Color(0x04000000),
-//        Color(0x12000000),
-//        Color(0x38000000),
-//      ],
-//      stops: <double>[0.0, 0.3, 0.6, 1.0],
-//    ),
-//  ),
-);
 
 /// A modal route that replaces the entire screen with an iOS transition.
 ///
@@ -98,6 +71,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
     @required this.builder,
     this.title,
     this.isPopup = false,
+    this.handleBuilder,
     RouteSettings settings,
     this.maintainState = true,
     bool fullscreenDialog = false,
@@ -118,6 +92,8 @@ class PanelPageRoute<T> extends PageRoute<T> {
   final String title;
 
   final bool isPopup;
+
+  final WidgetBuilder handleBuilder;
   
   ValueNotifier<String> _previousTitle;
 
@@ -255,7 +231,18 @@ class PanelPageRoute<T> extends PageRoute<T> {
               topLeft: Radius.circular(20),
               topRight: Radius.circular(20),
             ),
-            child: builder(context),
+            child: Stack(
+              children: [
+                builder(context),
+                if (handleBuilder != null)
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    right: 0,
+                    child: handleBuilder(context),
+                  ),
+              ],
+            ),
           ),
         )
       : builder(context);
@@ -310,7 +297,6 @@ class PanelPageRoute<T> extends PageRoute<T> {
       Animation<double> secondaryAnimation,
       Widget child,
       ) {
-    print("---> buildPageTransitions(): route is $route, child is $child");
 
     if (route.fullscreenDialog) {
       return CupertinoFullscreenDialogTransition(
