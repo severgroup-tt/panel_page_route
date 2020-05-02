@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:panelroute/panelroute.dart';
 
@@ -31,7 +32,20 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _onFabClick() {
     Navigator.of(context).push(
-      PanelPageRoute(builder: (context) => MyHomePage(pageNumber: widget.pageNumber + 1), isPopup: true),
+      PanelPageRoute(
+          builder: (context) => MyHomePage(pageNumber: widget.pageNumber + 1),
+          isPopup: true,
+          handleBuilder: (context) => Center(
+            child: Container(
+              height: 10,
+              width: 50,
+              decoration: BoxDecoration(
+                color: Colors.grey[500],
+                borderRadius: BorderRadius.all(Radius.circular(50)),
+              ),
+            ),
+          ),
+      ),
     );
   }
 

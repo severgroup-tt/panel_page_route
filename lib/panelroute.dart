@@ -15,16 +15,16 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/animation.dart' show Curves;
 
-const double _kBackGestureWidth = 20.0;
-const double _kMinFlingVelocity = 0.3; //1.0; // Screen widths per second.
+const double dismissGestureHeight = 50.0;
+const double minFlingVelocity = 0.1; // Screen heights per second
 
 // An eyeballed value for the maximum time it takes for a page to animate forward
 // if the user releases a page mid swipe.
-const int _kMaxDroppedSwipePageForwardAnimationTime = 800; // Milliseconds.
+const int maxDroppedSwipePageForwardAnimationTime = 800; // Milliseconds.
 
 // The maximum time for a page to get reset to it's original position if the
 // user releases a page mid swipe.
-const int _kMaxPageBackAnimationTime = 300; // Milliseconds.
+const int maxPageBackAnimationTime = 300; // Milliseconds.
 
 // Offset from offscreen to the right to fully on screen.
 final Animatable<Offset> _kRightMiddleTween = Tween<Offset>(
@@ -69,7 +69,6 @@ class PanelPageRoute<T> extends PageRoute<T> {
   /// be null.
   PanelPageRoute({
     @required this.builder,
-    this.title,
     this.isPopup = false,
     this.handleBuilder,
     RouteSettings settings,
@@ -84,53 +83,9 @@ class PanelPageRoute<T> extends PageRoute<T> {
   /// Builds the primary contents of the route.
   final WidgetBuilder builder;
 
-  /// A title string for this route.
-  ///
-  /// Used to auto-populate [CupertinoNavigationBar] and
-  /// [CupertinoSliverNavigationBar]'s `middle`/`largeTitle` widgets when
-  /// one is not manually supplied.
-  final String title;
-
   final bool isPopup;
 
   final WidgetBuilder handleBuilder;
-  
-  ValueNotifier<String> _previousTitle;
-
-  /// The title string of the previous [PanelPageRoute].
-  ///
-  /// The [ValueListenable]'s value is readable after the route is installed
-  /// onto a [Navigator]. The [ValueListenable] will also notify its listeners
-  /// if the value changes (such as by replacing the previous route).
-  ///
-  /// The [ValueListenable] itself will be null before the route is installed.
-  /// Its content value will be null if the previous route has no title or
-  /// is not a [PanelPageRoute].
-  ///
-  /// See also:
-  ///
-  ///  * [ValueListenableBuilder], which can be used to listen and rebuild
-  ///    widgets based on a ValueListenable.
-  ValueListenable<String> get previousTitle {
-    assert(
-    _previousTitle != null,
-    'Cannot read the previousTitle for a route that has not yet been installed',
-    );
-    return _previousTitle;
-  }
-
-  @override
-  void didChangePrevious(Route<dynamic> previousRoute) {
-    final String previousTitleString = previousRoute is PanelPageRoute
-        ? previousRoute.title
-        : null;
-    if (_previousTitle == null) {
-      _previousTitle = ValueNotifier<String>(previousTitleString);
-    } else {
-      _previousTitle.value = previousTitleString;
-    }
-    super.didChangePrevious(previousRoute);
-  }
 
   @override
   final bool maintainState;
@@ -156,7 +111,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
     return nextRoute is PanelPageRoute && !nextRoute.fullscreenDialog;
   }
 
-  /// True if an iOS-style back swipe pop gesture is currently underway for [route].
+  /// True if a swipe from the top is currently underway for [route].
   ///
   /// This just check the route's [NavigatorState.userGestureInProgress].
   ///
@@ -164,11 +119,11 @@ class PanelPageRoute<T> extends PageRoute<T> {
   ///
   ///  * [popGestureEnabled], which returns true if a user-triggered pop gesture
   ///    would be allowed.
-  static bool isPopGestureInProgress(PageRoute<dynamic> route) {
+  static bool isDismissGestureInProgress(PageRoute<dynamic> route) {
     return route.navigator.userGestureInProgress;
   }
 
-  /// True if an iOS-style back swipe pop gesture is currently underway for this route.
+  /// True if a swipe from the top is currently underway for this route.
   ///
   /// See also:
   ///
@@ -176,9 +131,9 @@ class PanelPageRoute<T> extends PageRoute<T> {
   ///    is currently underway for specific route.
   ///  * [popGestureEnabled], which returns true if a user-triggered pop gesture
   ///    would be allowed.
-  bool get popGestureInProgress => isPopGestureInProgress(this);
+  bool get dismissGestureInProgress => isDismissGestureInProgress(this);
 
-  /// Whether a pop gesture can be started by the user.
+  /// Whether a dismiss gesture can be started by the user.
   ///
   /// Returns true if the user can edge-swipe to a previous route.
   ///
@@ -187,9 +142,12 @@ class PanelPageRoute<T> extends PageRoute<T> {
   /// true first.
   ///
   /// This should only be used between frames, not during build.
-  bool get popGestureEnabled => _isPopGestureEnabled(this);
+  bool get dismissGestureEnabled => _isDismissGestureEnabled(this);
 
-  static bool _isPopGestureEnabled<T>(PageRoute<T> route) {
+  static bool _isDismissGestureEnabled<T>(PageRoute<T> route) {
+    // We can close with swipe only popup
+    if (route is PanelPageRoute && !(route as PanelPageRoute).isPopup)
+      return false;
     // If there's nothing to go back to, then obviously we don't support
     // the back gesture.
     if (route.isFirst)
@@ -214,7 +172,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
     if (route.secondaryAnimation.status != AnimationStatus.dismissed)
       return false;
     // If we're in a gesture already, we cannot start another.
-    if (isPopGestureInProgress(route))
+    if (isDismissGestureInProgress(route))
       return false;
 
     // Looks like a back gesture would be welcome!
@@ -267,10 +225,10 @@ class PanelPageRoute<T> extends PageRoute<T> {
   // Called by _CupertinoBackGestureDetector when a pop ("back") drag start
   // gesture is detected. The returned controller handles all of the subsequent
   // drag events.
-  static _PanelBackGestureController<T> _startPopGesture<T>(PageRoute<T> route) {
-    assert(_isPopGestureEnabled(route));
+  static _PanelDismissGestureController<T> _startDismissGesture<T>(PageRoute<T> route) {
+    assert(_isDismissGestureEnabled(route));
 
-    return _PanelBackGestureController<T>(
+    return _PanelDismissGestureController<T>(
       navigator: route.navigator,
       controller: route.controller, // protected access
     );
@@ -282,14 +240,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
   /// Used by [PanelPageRoute.buildTransitions].
   ///
   /// This method can be applied to any [PageRoute], not just
-  /// [PanelPageRoute]. It's typically used to provide a Cupertino style
-  /// horizontal transition for material widgets when the target platform
-  /// is [TargetPlatform.iOS].
-  ///
-  /// See also:
-  ///
-  ///  * [CupertinoPageTransitionsBuilder], which uses this method to define a
-  ///    [PageTransitionsBuilder] for the [PageTransitionsTheme].
+  /// [PanelPageRoute].
   static Widget buildPageTransitions<T>(
       PageRoute<T> route,
       BuildContext context,
@@ -312,10 +263,10 @@ class PanelPageRoute<T> extends PageRoute<T> {
         //
         // In the middle of a back gesture drag, let the transition be linear to
         // match finger motions.
-        linearTransition: isPopGestureInProgress(route),
-        child: _PanelBackGestureDetector<T>(
-          enabledCallback: () => _isPopGestureEnabled<T>(route),
-          onStartPopGesture: () => _startPopGesture<T>(route),
+        linearTransition: isDismissGestureInProgress(route),
+        child: _PanelDismissGestureDetector<T>(
+          enabledCallback: () => _isDismissGestureEnabled<T>(route),
+          onStartDismissGesture: () => _startDismissGesture<T>(route),
           child: child,
         ),
       );
@@ -331,10 +282,6 @@ class PanelPageRoute<T> extends PageRoute<T> {
   String get debugLabel => '${super.debugLabel}(${settings.name})';
 }
 
-/// Provides an iOS-style page transition animation.
-///
-/// The page slides in from the right and exits in reverse. It also shifts to the left in
-/// a parallax motion when another page enters to cover it.
 class PanelPageTransition extends StatelessWidget {
   /// Creates an iOS-style page transition.
   ///
@@ -355,41 +302,26 @@ class PanelPageTransition extends StatelessWidget {
           (linearTransition
               ? primaryRouteAnimation
               : CurvedAnimation(
-            // The curves below have been rigorously derived from plots of native
-            // iOS animation frames. Specifically, a video was taken of a page
-            // transition animation and the distance in each frame that the page
-            // moved was measured. A best fit bezier curve was the fitted to the
-            // point set, which is linearToEaseIn. Conversely, easeInToLinear is the
-            // reflection over the origin of linearToEaseIn.
-            parent: primaryRouteAnimation,
-            curve: Curves.linearToEaseOut,
-            reverseCurve: Curves.easeInToLinear,
-          )
+                  parent: primaryRouteAnimation,
+                  curve: Curves.linearToEaseOut,
+                  reverseCurve: Curves.easeInToLinear,
+                )
           ).drive(_kRightMiddleTween),
         _secondaryPositionAnimation =
           (linearTransition
               ? secondaryRouteAnimation
               : CurvedAnimation(
-            parent: secondaryRouteAnimation,
-            curve: Curves.linearToEaseOut,
-            reverseCurve: Curves.easeInToLinear,
-          )
+                  parent: secondaryRouteAnimation,
+                  curve: Curves.linearToEaseOut,
+                  reverseCurve: Curves.easeInToLinear,
+                )
           ).drive(_kMiddleLeftTween),
-//        _primaryShadowAnimation =
-//          (linearTransition
-//              ? primaryRouteAnimation
-//              : CurvedAnimation(
-//            parent: primaryRouteAnimation,
-//            curve: Curves.linearToEaseOut,
-//          )
-//          ).drive(_kGradientShadowTween),
         super(key: key);
 
   // When this page is coming in to cover another page.
   final Animation<Offset> _primaryPositionAnimation;
   // When this page is becoming covered by another page.
   final Animation<Color> _secondaryPositionAnimation;
-//  final Animation<Decoration> _primaryShadowAnimation;
 
   /// The widget below this widget in the tree.
   final Widget child;
@@ -398,27 +330,18 @@ class PanelPageTransition extends StatelessWidget {
   Widget build(BuildContext context) {
     assert(debugCheckHasDirectionality(context));
     final TextDirection textDirection = Directionality.of(context);
-//    return SlideTransition(
-//      position: _secondaryPositionAnimation,
-//      textDirection: textDirection,
-//      transformHitTests: false,
-//      child:
     return ColorFiltered(
       colorFilter: ColorFilter.mode(_secondaryPositionAnimation.value, BlendMode.srcOver),
       child: SlideTransition(
         position: _primaryPositionAnimation,
         textDirection: textDirection,
-//          child:
-//          ColorFiltered(
-//            colorFilter: ColorFilter.mode(_secondaryPositionAnimation.value, BlendMode.srcOver),
         child: child,
-//          )
       ),
     );
   }
 }
 
-/// This is the widget side of [_PanelBackGestureController].
+/// This is the widget side of [_PanelDismissGestureController].
 ///
 /// This widget provides a gesture recognizer which, when it determines the
 /// route can be closed with a back gesture, creates the controller and
@@ -429,14 +352,14 @@ class PanelPageTransition extends StatelessWidget {
 ///
 /// The type `T` specifies the return type of the route with which this gesture
 /// detector is associated.
-class _PanelBackGestureDetector<T> extends StatefulWidget {
-  const _PanelBackGestureDetector({
+class _PanelDismissGestureDetector<T> extends StatefulWidget {
+  const _PanelDismissGestureDetector({
     Key key,
     @required this.enabledCallback,
-    @required this.onStartPopGesture,
+    @required this.onStartDismissGesture,
     @required this.child,
   }) : assert(enabledCallback != null),
-        assert(onStartPopGesture != null),
+        assert(onStartDismissGesture != null),
         assert(child != null),
         super(key: key);
 
@@ -444,14 +367,14 @@ class _PanelBackGestureDetector<T> extends StatefulWidget {
 
   final ValueGetter<bool> enabledCallback;
 
-  final ValueGetter<_PanelBackGestureController<T>> onStartPopGesture;
+  final ValueGetter<_PanelDismissGestureController<T>> onStartDismissGesture;
 
   @override
-  _PanelBackGestureDetectorState<T> createState() => _PanelBackGestureDetectorState<T>();
+  _PanelDismissGestureDetectorState<T> createState() => _PanelDismissGestureDetectorState<T>();
 }
 
-class _PanelBackGestureDetectorState<T> extends State<_PanelBackGestureDetector<T>> {
-  _PanelBackGestureController<T> _backGestureController;
+class _PanelDismissGestureDetectorState<T> extends State<_PanelDismissGestureDetector<T>> {
+  _PanelDismissGestureController<T> _dismissGestureController;
 
   VerticalDragGestureRecognizer _recognizer;
 
@@ -473,29 +396,29 @@ class _PanelBackGestureDetectorState<T> extends State<_PanelBackGestureDetector<
 
   void _handleDragStart(DragStartDetails details) {
     assert(mounted);
-    assert(_backGestureController == null);
-    _backGestureController = widget.onStartPopGesture();
+    assert(_dismissGestureController == null);
+    _dismissGestureController = widget.onStartDismissGesture();
   }
 
   void _handleDragUpdate(DragUpdateDetails details) {
     assert(mounted);
-    assert(_backGestureController != null);
-    _backGestureController.dragUpdate(_convertToLogical(details.primaryDelta / context.size.height));
+    assert(_dismissGestureController != null);
+    _dismissGestureController.dragUpdate(_convertToLogical(details.primaryDelta / context.size.height));
   }
 
   void _handleDragEnd(DragEndDetails details) {
     assert(mounted);
-    assert(_backGestureController != null);
-    _backGestureController.dragEnd(_convertToLogical(details.velocity.pixelsPerSecond.dx / context.size.height));
-    _backGestureController = null;
+    assert(_dismissGestureController != null);
+    _dismissGestureController.dragEnd(_convertToLogical(details.velocity.pixelsPerSecond.dx / context.size.height));
+    _dismissGestureController = null;
   }
 
   void _handleDragCancel() {
     assert(mounted);
     // This can be called even if start is not called, paired with the "down" event
     // that we don't consider here.
-    _backGestureController?.dragEnd(0.0);
-    _backGestureController = null;
+    _dismissGestureController?.dragEnd(0.0);
+    _dismissGestureController = null;
   }
 
   void _handlePointerDown(PointerDownEvent event) {
@@ -518,7 +441,7 @@ class _PanelBackGestureDetectorState<T> extends State<_PanelBackGestureDetector<
     assert(debugCheckHasDirectionality(context));
     // For devices with notches, the drag area needs to be larger on the side
     // that has the notch.
-    final double dragAreaHeight = MediaQuery.of(context).padding.top + 50;
+    final double dragAreaHeight = MediaQuery.of(context).padding.top + dismissGestureHeight;
     return Stack(
       fit: StackFit.passthrough,
       children: <Widget>[
@@ -537,10 +460,8 @@ class _PanelBackGestureDetectorState<T> extends State<_PanelBackGestureDetector<
   }
 }
 
-/// A controller for an iOS-style back gesture.
-///
 /// This is created by a [PanelPageRoute] in response from a gesture caught
-/// by a [_PanelBackGestureDetector] widget, which then also feeds it input
+/// by a [_PanelDismissGestureDetector] widget, which then also feeds it input
 /// from the gesture. It controls the animation controller owned by the route,
 /// based on the input provided by the gesture detector.
 ///
@@ -549,11 +470,11 @@ class _PanelBackGestureDetectorState<T> extends State<_PanelBackGestureDetector<
 ///
 /// The type `T` specifies the return type of the route with which this gesture
 /// detector controller is associated.
-class _PanelBackGestureController<T> {
+class _PanelDismissGestureController<T> {
   /// Creates a controller for an iOS-style back gesture.
   ///
   /// The [navigator] and [controller] arguments must not be null.
-  _PanelBackGestureController({
+  _PanelDismissGestureController({
     @required this.navigator,
     @required this.controller,
   }) : assert(navigator != null),
@@ -570,9 +491,11 @@ class _PanelBackGestureController<T> {
     controller.value -= delta;
   }
 
-  /// The drag gesture has ended with a horizontal motion of
-  /// [fractionalVelocity] as a fraction of screen width per second.
+  /// The drag gesture has ended with a vertical motion of
+  /// [fractionalVelocity] as a fraction of screen heights per second.
   void dragEnd(double velocity) {
+    print("dragEnd(): velocity = $velocity");
+
     // Fling in the appropriate direction.
     // AnimationController.fling is guaranteed to
     // take at least one frame.
@@ -585,7 +508,7 @@ class _PanelBackGestureController<T> {
     // If the user releases the page before mid screen with sufficient velocity,
     // or after mid screen, we should animate the page out. Otherwise, the page
     // should be animated back in.
-    if (velocity.abs() >= _kMinFlingVelocity)
+    if (velocity.abs() >= minFlingVelocity)
       animateForward = velocity <= 0;
     else
       animateForward = controller.value > 0.5;
@@ -595,8 +518,8 @@ class _PanelBackGestureController<T> {
       // We want to cap the animation time, but we want to use a linear curve
       // to determine it.
       final int droppedPageForwardAnimationTime = min(
-        lerpDouble(_kMaxDroppedSwipePageForwardAnimationTime, 0, controller.value).floor(),
-        _kMaxPageBackAnimationTime,
+        lerpDouble(maxDroppedSwipePageForwardAnimationTime, 0, controller.value).floor(),
+        maxPageBackAnimationTime,
       );
       controller.animateTo(1.0, duration: Duration(milliseconds: droppedPageForwardAnimationTime), curve: animationCurve);
     } else {
@@ -606,7 +529,7 @@ class _PanelBackGestureController<T> {
       // The popping may have finished inline if already at the target destination.
       if (controller.isAnimating) {
         // Otherwise, use a custom popping animation duration and curve.
-        final int droppedPageBackAnimationTime = lerpDouble(0, _kMaxDroppedSwipePageForwardAnimationTime, controller.value).floor();
+        final int droppedPageBackAnimationTime = lerpDouble(0, maxDroppedSwipePageForwardAnimationTime, controller.value).floor();
         controller.animateBack(0.0, duration: Duration(milliseconds: droppedPageBackAnimationTime), curve: animationCurve);
       }
     }
@@ -626,128 +549,3 @@ class _PanelBackGestureController<T> {
     }
   }
 }
-
-// A custom [Decoration] used to paint an extra shadow on the start edge of the
-// box it's decorating. It's like a [BoxDecoration] with only a gradient except
-// it paints on the start side of the box instead of behind the box.
-//
-// The [edgeGradient] will be given a [TextDirection] when its shader is
-// created, and so can be direction-sensitive; in this file we set it to a
-// gradient that uses an AlignmentDirectional to position the gradient on the
-// end edge of the gradient's box (which will be the edge adjacent to the start
-// edge of the actual box we're supposed to paint in).
-//class _PanelEdgeShadowDecoration extends Decoration {
-//  const _PanelEdgeShadowDecoration({ this.edgeGradient });
-//
-//  // An edge shadow decoration where the shadow is null. This is used
-//  // for interpolating from no shadow.
-//  static const _PanelEdgeShadowDecoration none =
-//  _PanelEdgeShadowDecoration();
-//
-//  // A gradient to draw to the left of the box being decorated.
-//  // Alignments are relative to the original box translated one box
-//  // width to the left.
-//  final LinearGradient edgeGradient;
-//
-//  // Linearly interpolate between two edge shadow decorations decorations.
-//  //
-//  // The `t` argument represents position on the timeline, with 0.0 meaning
-//  // that the interpolation has not started, returning `a` (or something
-//  // equivalent to `a`), 1.0 meaning that the interpolation has finished,
-//  // returning `b` (or something equivalent to `b`), and values in between
-//  // meaning that the interpolation is at the relevant point on the timeline
-//  // between `a` and `b`. The interpolation can be extrapolated beyond 0.0 and
-//  // 1.0, so negative values and values greater than 1.0 are valid (and can
-//  // easily be generated by curves such as [Curves.elasticInOut]).
-//  //
-//  // Values for `t` are usually obtained from an [Animation<double>], such as
-//  // an [AnimationController].
-//  //
-//  // See also:
-//  //
-//  //  * [Decoration.lerp].
-//  static _PanelEdgeShadowDecoration lerp(
-//      _PanelEdgeShadowDecoration a,
-//      _PanelEdgeShadowDecoration b,
-//      double t,
-//      ) {
-//    assert(t != null);
-//    if (a == null && b == null)
-//      return null;
-//    return _PanelEdgeShadowDecoration(
-//      edgeGradient: LinearGradient.lerp(a?.edgeGradient, b?.edgeGradient, t),
-//    );
-//  }
-//
-//  @override
-//  _PanelEdgeShadowDecoration lerpFrom(Decoration a, double t) {
-//    if (a is! _PanelEdgeShadowDecoration)
-//      return _PanelEdgeShadowDecoration.lerp(null, this, t);
-//    return _PanelEdgeShadowDecoration.lerp(a, this, t);
-//  }
-//
-//  @override
-//  _PanelEdgeShadowDecoration lerpTo(Decoration b, double t) {
-//    if (b is! _PanelEdgeShadowDecoration)
-//      return _PanelEdgeShadowDecoration.lerp(this, null, t);
-//    return _PanelEdgeShadowDecoration.lerp(this, b, t);
-//  }
-//
-//  @override
-//  _PanelEdgeShadowPainter createBoxPainter([ VoidCallback onChanged ]) {
-//    return _PanelEdgeShadowPainter(this, onChanged);
-//  }
-//
-//  @override
-//  bool operator ==(dynamic other) {
-//    if (runtimeType != other.runtimeType)
-//      return false;
-//    final _PanelEdgeShadowDecoration typedOther = other;
-//    return edgeGradient == typedOther.edgeGradient;
-//  }
-//
-//  @override
-//  int get hashCode => edgeGradient.hashCode;
-//
-//  @override
-//  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
-//    super.debugFillProperties(properties);
-//    properties.add(DiagnosticsProperty<LinearGradient>('edgeGradient', edgeGradient));
-//  }
-//}
-
-/// A [BoxPainter] used to draw the page transition shadow using gradients.
-//class _PanelEdgeShadowPainter extends BoxPainter {
-//  _PanelEdgeShadowPainter(
-//      this._decoration,
-//      VoidCallback onChange,
-//      ) : assert(_decoration != null),
-//        super(onChange);
-//
-//  final _PanelEdgeShadowDecoration _decoration;
-//
-//  @override
-//  void paint(Canvas canvas, Offset offset, ImageConfiguration configuration) {
-//    final LinearGradient gradient = _decoration.edgeGradient;
-//    if (gradient == null)
-//      return;
-//    // The drawable space for the gradient is a rect with the same size as
-//    // its parent box one box width on the start side of the box.
-//    final TextDirection textDirection = configuration.textDirection;
-//    assert(textDirection != null);
-//    double deltaX;
-//    switch (textDirection) {
-//      case TextDirection.rtl:
-//        deltaX = configuration.size.width;
-//        break;
-//      case TextDirection.ltr:
-//        deltaX = -configuration.size.width;
-//        break;
-//    }
-//    final Rect rect = (offset & configuration.size).translate(deltaX, 0.0);
-//    final Paint paint = Paint()
-//      ..shader = gradient.createShader(rect, textDirection: textDirection);
-//
-//    canvas.drawRect(rect, paint);
-//  }
-//}
