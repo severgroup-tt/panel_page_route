@@ -15,6 +15,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/animation.dart' show Curves;
 
+typedef PanelWidgetBuilder = Widget Function(BuildContext, ScrollController);
+
 const double dismissGestureHeight = 50.0;
 const double minFlingVelocity = 0.1; // Screen heights per second
 
@@ -37,6 +39,8 @@ final Animatable<Color> _kMiddleLeftTween = ColorTween(
   begin: Colors.transparent,
   end: Colors.black,
 );
+
+// TODO: implement gesture recognizer for full screen swipe
 
 /// A modal route that replaces the entire screen with an iOS transition.
 ///
@@ -81,11 +85,13 @@ class PanelPageRoute<T> extends PageRoute<T> {
         super(settings: settings, fullscreenDialog: fullscreenDialog);
 
   /// Builds the primary contents of the route.
-  final WidgetBuilder builder;
+  final PanelWidgetBuilder builder;
 
   final bool isPopup;
 
   final WidgetBuilder handleBuilder;
+
+  final ScrollController scrollController = ScrollController();
 
   @override
   final bool maintainState;
@@ -191,7 +197,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
             ),
             child: Stack(
               children: [
-                builder(context),
+                builder(context, scrollController),
                 if (handleBuilder != null)
                   Positioned(
                     left: 0,
@@ -203,7 +209,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
             ),
           ),
         )
-      : builder(context);
+      : builder(context, scrollController);
 
     final Widget result = Semantics(
       scopesRoute: true,
@@ -247,6 +253,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
       Animation<double> animation,
       Animation<double> secondaryAnimation,
       Widget child,
+      ScrollController scrollController,
       ) {
 
     if (route.fullscreenDialog) {
@@ -265,17 +272,59 @@ class PanelPageRoute<T> extends PageRoute<T> {
         // match finger motions.
         linearTransition: isDismissGestureInProgress(route),
         child: _PanelDismissGestureDetector<T>(
-          enabledCallback: () => _isDismissGestureEnabled<T>(route),
+          isDismissGesture: (event) => _isDismissGesture<T>(route, event, scrollController),
+          isOverscrollAllowed: (event) => _isDismissOnOverscrollAllowed(route, event, scrollController),
           onStartDismissGesture: () => _startDismissGesture<T>(route),
           child: child,
+          scrollController: scrollController,
         ),
       );
     }
   }
 
+  static DismissGesture _isDismissGesture<T>(PageRoute<T> route, PointerDownEvent event, ScrollController scrollController) {
+    print("[PanelPageRoute] _isSwipeToDismissAllowed() delta = ${event.delta.dy}");
+
+    if (!_isDismissGestureEnabled(route)) {
+      print("[PanelPageRoute] _isSwipeToDismissAllowed() dismiss gesture is disabled");
+      return null;
+    }
+
+    if (event.position.dy <= dismissGestureHeight) {
+      print("[PanelPageRoute] _isSwipeToDismissAllowed() position is ${event.position.dy} and is in gesture zone");
+      return DismissGesture.handle;
+    }
+
+    try {
+      print("[PanelPageRoute] _isSwipeToDismissAllowedForMovement() scrollController ofset = ${scrollController.offset}, delta = ${event.delta.dy}");
+      if (scrollController.offset <= 0) {
+        return DismissGesture.overscroll;
+      }
+    } catch (e) {
+      print("[PanelPageRoute] _isSwipeToDismissAllowedForMovement() error: ${e.toString()}");
+    }
+
+    return null;
+  }
+
+  static bool _isDismissOnOverscrollAllowed<T>(PageRoute<T> route, PointerMoveEvent event, ScrollController scrollController) {
+    print("[PanelPageRoute] _isSwipeToDismissAllowedForMovement() dy = ${event.delta.dy}");
+
+    try {
+      print("[PanelPageRoute] _isSwipeToDismissAllowedForMovement() scrollController ofset = ${scrollController.offset}, delta = ${event.delta.dy}");
+      if (event.delta.dy > 0 && scrollController.offset <= 0) {
+        return true;
+      }
+    } catch (e) {
+      print("[PanelPageRoute] _isSwipeToDismissAllowedForMovement() error: ${e.toString()}");
+    }
+
+    return false;
+  }
+
   @override
   Widget buildTransitions(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation, Widget child) {
-    return buildPageTransitions<T>(this, context, animation, secondaryAnimation, child);
+    return buildPageTransitions<T>(this, context, animation, secondaryAnimation, child, scrollController);
   }
 
   @override
@@ -341,6 +390,8 @@ class PanelPageTransition extends StatelessWidget {
   }
 }
 
+
+
 /// This is the widget side of [_PanelDismissGestureController].
 ///
 /// This widget provides a gesture recognizer which, when it determines the
@@ -355,28 +406,40 @@ class PanelPageTransition extends StatelessWidget {
 class _PanelDismissGestureDetector<T> extends StatefulWidget {
   const _PanelDismissGestureDetector({
     Key key,
-    @required this.enabledCallback,
+    @required this.isDismissGesture,
+    @required this.isOverscrollAllowed,
     @required this.onStartDismissGesture,
     @required this.child,
-  }) : assert(enabledCallback != null),
+    this.scrollController,
+  }) : assert(isDismissGesture != null),
+        assert(isOverscrollAllowed != null),
         assert(onStartDismissGesture != null),
         assert(child != null),
         super(key: key);
 
   final Widget child;
 
-  final ValueGetter<bool> enabledCallback;
+  final DismissGesture Function(PointerDownEvent) isDismissGesture;
+  final bool Function(PointerMoveEvent) isOverscrollAllowed;
 
   final ValueGetter<_PanelDismissGestureController<T>> onStartDismissGesture;
 
+  final ScrollController scrollController;
+
   @override
-  _PanelDismissGestureDetectorState<T> createState() => _PanelDismissGestureDetectorState<T>();
+  _PanelDismissOnTopGestureDetectorState<T> createState() => _PanelDismissOnTopGestureDetectorState<T>(scrollController);
 }
 
-class _PanelDismissGestureDetectorState<T> extends State<_PanelDismissGestureDetector<T>> {
+class _PanelDismissOnTopGestureDetectorState<T> extends State<_PanelDismissGestureDetector<T>> {
   _PanelDismissGestureController<T> _dismissGestureController;
 
   VerticalDragGestureRecognizer _recognizer;
+
+  final ScrollController scrollController;
+
+  DismissGesture _dismissGesture;
+
+  _PanelDismissOnTopGestureDetectorState(this.scrollController);
 
   @override
   void initState() {
@@ -411,6 +474,7 @@ class _PanelDismissGestureDetectorState<T> extends State<_PanelDismissGestureDet
     assert(_dismissGestureController != null);
     _dismissGestureController.dragEnd(_convertToLogical(details.velocity.pixelsPerSecond.dx / context.size.height));
     _dismissGestureController = null;
+    _dismissGesture = null;
   }
 
   void _handleDragCancel() {
@@ -419,11 +483,25 @@ class _PanelDismissGestureDetectorState<T> extends State<_PanelDismissGestureDet
     // that we don't consider here.
     _dismissGestureController?.dragEnd(0.0);
     _dismissGestureController = null;
+    _dismissGesture = null;
   }
 
   void _handlePointerDown(PointerDownEvent event) {
-    if (widget.enabledCallback())
+    _dismissGesture = widget.isDismissGesture(event);
+    if (_dismissGesture != null) {
+      print("_handlePointerDown() enable gesture");
       _recognizer.addPointer(event);
+    }
+  }
+
+  void _handlePointerMove(PointerMoveEvent event) {
+    print("_handlePointerMove()");
+
+    if (_dismissGesture == DismissGesture.overscroll && !widget.isOverscrollAllowed(event)) {
+      print("_handlePointerMove() reject gesture");
+      _recognizer.rejectGesture(event.pointer);
+      _dismissGesture = null;
+    }
   }
 
   double _convertToLogical(double value) {
@@ -446,14 +524,10 @@ class _PanelDismissGestureDetectorState<T> extends State<_PanelDismissGestureDet
       fit: StackFit.passthrough,
       children: <Widget>[
         widget.child,
-        PositionedDirectional(
-          start: 0.0,
-          height: dragAreaHeight,
-          top: 0.0,
-          child: Listener(
-            onPointerDown: _handlePointerDown,
-            behavior: HitTestBehavior.translucent,
-          ),
+        Listener(
+          onPointerDown: _handlePointerDown,
+          onPointerMove: _handlePointerMove,
+          behavior: HitTestBehavior.translucent,
         ),
       ],
     );
@@ -549,3 +623,5 @@ class _PanelDismissGestureController<T> {
     }
   }
 }
+
+enum DismissGesture { handle, overscroll }

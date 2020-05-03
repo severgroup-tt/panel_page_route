@@ -14,15 +14,16 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
       ),
 //      home: MyHomePage(title: 'Flutter Demo Home Page'),
-      onGenerateRoute: (settings) => PanelPageRoute(builder: (context) => MyHomePage(pageNumber: 0)),
+      onGenerateRoute: (settings) => PanelPageRoute(builder: (context, sc) => MyHomePage(pageNumber: 0, scrollController: sc,)),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.pageNumber}) : super(key: key);
+  MyHomePage({Key key, this.pageNumber, this.scrollController}) : super(key: key);
 
   final int pageNumber;
+  final ScrollController scrollController;
 
   @override
   _MyHomePageState createState() => _MyHomePageState();
@@ -33,15 +34,19 @@ class _MyHomePageState extends State<MyHomePage> {
   void _onFabClick() {
     Navigator.of(context).push(
       PanelPageRoute(
-          builder: (context) => MyHomePage(pageNumber: widget.pageNumber + 1),
+          builder: (context, sc) => MyHomePage(pageNumber: widget.pageNumber + 1, scrollController: sc,),
           isPopup: true,
           handleBuilder: (context) => Center(
             child: Container(
-              height: 10,
-              width: 50,
-              decoration: BoxDecoration(
-                color: Colors.grey[500],
-                borderRadius: BorderRadius.all(Radius.circular(50)),
+              height: 20,
+              alignment: AlignmentDirectional.bottomCenter,
+              child: Container(
+                height: 8,
+                width: 24,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.all(Radius.circular(50)),
+                ),
               ),
             ),
           ),
@@ -55,17 +60,23 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBar(
         title: Text("Hey"),
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Text(
-              "Page number ${widget.pageNumber}",
-              style: Theme.of(context).textTheme.display1,
-            ),
-          ],
-        ),
-      ),
+      body: ListView.builder(
+              itemBuilder: (_, __) => Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Container(
+                  color: Colors.green,
+                  height: 50,
+                  child: Center(
+                    child: Text(
+                      "Page number ${widget.pageNumber}",
+                      style: Theme.of(context).textTheme.display1,
+                    ),
+                  ),
+                ),
+              ),
+              itemCount: 50,
+              controller: widget.scrollController,
+          ),
       floatingActionButton: FloatingActionButton(
         onPressed: _onFabClick,
 
