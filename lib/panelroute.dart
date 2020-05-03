@@ -585,7 +585,7 @@ class _PanelDismissGestureController<T> {
     // If the user releases the page before mid screen with sufficient velocity,
     // or after mid screen, we should animate the page out. Otherwise, the page
     // should be animated back in.
-    if (velocity < 0 && velocity.abs() >= minFlingVelocity) {
+    if (velocity.abs() >= minFlingVelocity) {
       animateForward = velocity <= 0;
     } else {
       animateForward = controller.value > 0.5;
