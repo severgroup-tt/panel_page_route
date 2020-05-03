@@ -15,7 +15,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/animation.dart' show Curves;
 
-typedef PanelWidgetBuilder = Widget Function(BuildContext, ScrollController);
+typedef PanelWidgetBuilder = Widget Function(BuildContext, DelegatingScrollController);
 
 const double dismissGestureHeight = 50.0;
 const double minFlingVelocity = 0.1; // Screen heights per second
@@ -78,10 +78,13 @@ class PanelPageRoute<T> extends PageRoute<T> {
     RouteSettings settings,
     this.maintainState = true,
     bool fullscreenDialog = false,
+    int scrollViewCount = 1,
+    int defaultScrollView = 0,
   }) : assert(builder != null),
         assert(maintainState != null),
         assert(fullscreenDialog != null),
         assert(opaque),
+        scrollController = DelegatingScrollController(scrollViewCount, defaultScrollView: defaultScrollView),
         super(settings: settings, fullscreenDialog: fullscreenDialog);
 
   /// Builds the primary contents of the route.
@@ -91,7 +94,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
 
   final WidgetBuilder handleBuilder;
 
-  final ScrollController scrollController = ScrollController();
+  final ScrollController scrollController;
 
   @override
   final bool maintainState;
@@ -626,3 +629,114 @@ class _PanelDismissGestureController<T> {
 }
 
 enum DismissGesture { handle, overscroll }
+
+class DelegatingScrollController implements ScrollController {
+  final List<ScrollController> _delegates;
+  final List<VoidCallback> _listeners = [];
+
+  ScrollController _currentDelegate;
+
+  DelegatingScrollController(int scrollViewCount, {int defaultScrollView = 0})
+      : _delegates = [for (int i = 0; i < scrollViewCount; i++) ScrollController()] {
+    _currentDelegate = _delegates[defaultScrollView];
+  }
+
+  void delegateTo(int i) {
+    _listeners.forEach((listener) => _currentDelegate.removeListener(listener));
+    this._currentDelegate = _delegates[i];
+    _listeners.forEach((listener) => _currentDelegate.addListener(listener));
+  }
+
+  @override
+  void debugFillDescription(List<String> description) {
+    _currentDelegate.debugFillDescription(description);
+  }
+
+  @override
+  String toString() {
+    return _currentDelegate.toString();
+  }
+
+  @override
+  ScrollPosition createScrollPosition(ScrollPhysics physics, ScrollContext context, ScrollPosition oldPosition) {
+    return _currentDelegate.createScrollPosition(physics, context, oldPosition);
+  }
+
+  @override
+  void dispose() {
+    _currentDelegate.dispose();
+  }
+
+  @override
+  void detach(ScrollPosition position) {
+    _currentDelegate.detach(position);
+  }
+
+  @override
+  void attach(ScrollPosition position) {
+    _currentDelegate.attach(position);
+  }
+
+  @override
+  void jumpTo(double value) {
+    _currentDelegate.jumpTo(value);
+  }
+
+  @override
+  Future<Function> animateTo(double offset, {@required Duration duration, @required Curve curve}) {
+    return _currentDelegate.animateTo(offset, duration: duration, curve: curve);
+  }
+
+  @override
+  double get offset {
+    return _currentDelegate.offset;
+  }
+
+  @override
+  ScrollPosition get position {
+    return _currentDelegate.position;
+  }
+
+  @override
+  bool get hasClients {
+    return _currentDelegate.hasClients;
+  }
+
+  @override
+  Iterable<ScrollPosition> get positions {
+    return _currentDelegate.positions;
+  }
+
+  @override
+  double get initialScrollOffset {
+    return _currentDelegate.initialScrollOffset;
+  }
+
+  @override
+  void addListener(listener) {
+    _listeners.add(listener);
+    _currentDelegate.addListener(listener);
+  }
+
+  @override
+  String get debugLabel => _currentDelegate.debugLabel;
+
+  @override
+  bool get hasListeners => _currentDelegate.hasListeners;
+
+  @override
+  bool get keepScrollOffset => _currentDelegate.keepScrollOffset;
+
+  @override
+  void notifyListeners() {
+    _currentDelegate.notifyListeners();
+  }
+
+  @override
+  void removeListener(listener) {
+    _listeners.remove(listener);
+    _currentDelegate.removeListener(listener);
+  }
+
+  ScrollController delegate(int i) => _delegates[i];
+}
