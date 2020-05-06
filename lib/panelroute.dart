@@ -282,20 +282,15 @@ class PanelPageRoute<T> extends PageRoute<T> {
   }
 
   static DismissGesture _isDismissGesture<T>(PageRoute<T> route, PointerDownEvent event, ScrollController scrollController) {
-    print("[PanelPageRoute] _isSwipeToDismissAllowed() delta = ${event.delta.dy}");
-
     if (!_isDismissGestureEnabled(route)) {
-      print("[PanelPageRoute] _isSwipeToDismissAllowed() dismiss gesture is disabled");
       return null;
     }
 
     if (event.position.dy <= dismissGestureHeight) {
-      print("[PanelPageRoute] _isSwipeToDismissAllowed() position is ${event.position.dy} and is in gesture zone");
       return DismissGesture.handle;
     }
 
     try {
-      print("[PanelPageRoute] _isSwipeToDismissAllowedForMovement() scrollController ofset = ${scrollController.offset}, delta = ${event.delta.dy}");
       if (scrollController.offset <= 0) {
         return DismissGesture.overscroll;
       }
@@ -307,10 +302,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
   }
 
   static bool _isDismissOnOverscrollAllowed<T>(PageRoute<T> route, PointerMoveEvent event, ScrollController scrollController) {
-    print("[PanelPageRoute] _isSwipeToDismissAllowedForMovement() dy = ${event.delta.dy}");
-
     try {
-      print("[PanelPageRoute] _isSwipeToDismissAllowedForMovement() scrollController ofset = ${scrollController.offset}, delta = ${event.delta.dy}");
       if (event.delta.dy > 0 && scrollController.offset <= 0) {
         return true;
       }
@@ -488,16 +480,12 @@ class _PanelDismissOnTopGestureDetectorState<T> extends State<_PanelDismissGestu
   void _handlePointerDown(PointerDownEvent event) {
     _dismissGesture = widget.isDismissGesture(event);
     if (_dismissGesture != null) {
-      print("_handlePointerDown() enable gesture");
       _recognizer.addPointer(event);
     }
   }
 
   void _handlePointerMove(PointerMoveEvent event) {
-    print("_handlePointerMove()");
-
     if (_dismissGesture == DismissGesture.overscroll && !widget.isOverscrollAllowed(event)) {
-      print("_handlePointerMove() reject gesture");
       _recognizer.rejectGesture(event.pointer);
       _dismissGesture = null;
     }
@@ -567,8 +555,6 @@ class _PanelDismissGestureController<T> {
   /// The drag gesture has ended with a vertical motion of
   /// [fractionalVelocity] as a fraction of screen heights per second.
   void dragEnd(double velocity) {
-    print("dragEnd(): velocity = $velocity");
-
     // Fling in the appropriate direction.
     // AnimationController.fling is guaranteed to
     // take at least one frame.
