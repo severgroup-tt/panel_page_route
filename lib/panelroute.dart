@@ -7,13 +7,13 @@ library panelroute;
 import 'dart:math';
 import 'dart:ui' show lerpDouble;
 
+import 'package:flutter/animation.dart' show Curves;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
-import 'package:flutter/animation.dart' show Curves;
 
 typedef PanelWidgetBuilder = Widget Function(BuildContext, DelegatingScrollController);
 
@@ -257,7 +257,9 @@ class PanelPageRoute<T> extends PageRoute<T> {
 
     if (route.fullscreenDialog) {
       return CupertinoFullscreenDialogTransition(
-        animation: animation,
+        primaryRouteAnimation: animation,
+        secondaryRouteAnimation: animation,
+        linearTransition: true,
         child: child,
       );
     } else {
@@ -504,9 +506,6 @@ class _PanelDismissOnTopGestureDetectorState<T> extends State<_PanelDismissGestu
   @override
   Widget build(BuildContext context) {
     assert(debugCheckHasDirectionality(context));
-    // For devices with notches, the drag area needs to be larger on the side
-    // that has the notch.
-    final double dragAreaHeight = MediaQuery.of(context).padding.top + dismissGestureHeight;
     return Stack(
       fit: StackFit.passthrough,
       children: <Widget>[
