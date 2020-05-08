@@ -69,7 +69,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   child: Center(
                     child: Text(
                       "Page number ${widget.pageNumber}",
-                      style: Theme.of(context).textTheme.display1,
+                      style: Theme.of(context).textTheme.headline4,
                     ),
                   ),
                 ),
