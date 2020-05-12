@@ -14,6 +14,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter/services.dart';
 
 typedef PanelWidgetBuilder = Widget Function(BuildContext, DelegatingScrollController);
 
@@ -187,28 +188,33 @@ class PanelPageRoute<T> extends PageRoute<T> {
   @override
   Widget buildPage(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation) {
     final Widget child = isPopup
-      ? SafeArea(
-          bottom: false,
-          child: ClipRRect(
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
+        ? AnnotatedRegion<SystemUiOverlayStyle>(
+            value: SystemUiOverlayStyle(
+              statusBarBrightness: Brightness.dark,
             ),
-            child: Stack(
-              children: [
-                builder(context, scrollController),
-                if (handleBuilder != null)
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    right: 0,
-                    child: handleBuilder(context),
-                  ),
-              ],
+            child: SafeArea(
+              bottom: false,
+              child: ClipRRect(
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+                child: Stack(
+                  children: [
+                    builder(context, scrollController),
+                    if (handleBuilder != null)
+                      Positioned(
+                        left: 0,
+                        top: 0,
+                        right: 0,
+                        child: handleBuilder(context),
+                      ),
+                  ],
+                ),
+              ),
             ),
-          ),
-        )
-      : builder(context, scrollController);
+          )
+        : builder(context, scrollController);
 
     final Widget result = Semantics(
       scopesRoute: true,
@@ -382,8 +388,6 @@ class PanelPageTransition extends StatelessWidget {
     );
   }
 }
-
-
 
 /// This is the widget side of [_PanelDismissGestureController].
 ///
