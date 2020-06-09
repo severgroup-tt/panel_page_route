@@ -158,9 +158,9 @@ class PanelPageRoute<T> extends PageRoute<T> {
 
   static bool _isDismissGestureEnabled<T>(
       PageRoute<T> route,
-      DismissGestureLocker scrollLocker,
+      DismissGestureLocker dismissGestureLocker,
       ) {
-    if (scrollLocker.isDismissGestureLocked) return false;
+    if (dismissGestureLocker.isDismissGestureLocked) return false;
     // We can close with swipe only popup
     if (route is PanelPageRoute && !(route as PanelPageRoute).isPopup) return false;
     // If there's nothing to go back to, then obviously we don't support
@@ -235,8 +235,8 @@ class PanelPageRoute<T> extends PageRoute<T> {
   // Called by _CupertinoBackGestureDetector when a pop ("back") drag start
   // gesture is detected. The returned controller handles all of the subsequent
   // drag events.
-  static _PanelDismissGestureController<T> _startDismissGesture<T>(PageRoute<T> route, DismissGestureLocker scrollLocker) {
-    assert(_isDismissGestureEnabled(route, scrollLocker));
+  static _PanelDismissGestureController<T> _startDismissGesture<T>(PageRoute<T> route, DismissGestureLocker dismissGestureLocker) {
+    assert(_isDismissGestureEnabled(route, dismissGestureLocker));
 
     return _PanelDismissGestureController<T>(
       navigator: route.navigator,
@@ -258,7 +258,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
       Animation<double> secondaryAnimation,
       Widget child,
       ScrollController scrollController,
-      DismissGestureLocker scrollLocker,
+      DismissGestureLocker dismissGestureLocker,
       ) {
     if (route.fullscreenDialog) {
       return CupertinoFullscreenDialogTransition(
@@ -278,9 +278,9 @@ class PanelPageRoute<T> extends PageRoute<T> {
         // match finger motions.
         linearTransition: isDismissGestureInProgress(route),
         child: _PanelDismissGestureDetector<T>(
-          isDismissGesture: (event) => _isDismissGesture<T>(route, event, scrollController, scrollLocker),
+          isDismissGesture: (event) => _isDismissGesture<T>(route, event, scrollController, dismissGestureLocker),
           isOverscrollAllowed: (event) => _isDismissOnOverscrollAllowed(route, event, scrollController),
-          onStartDismissGesture: () => _startDismissGesture<T>(route, scrollLocker),
+          onStartDismissGesture: () => _startDismissGesture<T>(route, dismissGestureLocker),
           child: child,
           scrollController: scrollController,
         ),
@@ -292,9 +292,9 @@ class PanelPageRoute<T> extends PageRoute<T> {
       PageRoute<T> route,
       PointerDownEvent event,
       ScrollController scrollController,
-      DismissGestureLocker scrollLocker,
+      DismissGestureLocker dismissGestureLocker,
       ) {
-    if (!_isDismissGestureEnabled(route, scrollLocker)) {
+    if (!_isDismissGestureEnabled(route, dismissGestureLocker)) {
       return null;
     }
 
