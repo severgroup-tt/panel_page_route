@@ -68,6 +68,8 @@ final Animatable<Color> _kMiddleLeftTween = ColorTween(
 ///  * [CupertinoTabScaffold], for applications that have a tab bar at the
 ///    bottom with multiple pages.
 class PanelPageRoute<T> extends PageRoute<T> {
+  static const _safeZoneHeight = 50;
+
   /// Creates a page route for use in an iOS designed app.
   ///
   /// The [builder], [maintainState], and [fullscreenDialog] arguments must not
@@ -278,7 +280,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
         // match finger motions.
         linearTransition: isDismissGestureInProgress(route),
         child: _PanelDismissGestureDetector<T>(
-          isDismissGesture: (event) => _isDismissGesture<T>(route, event, scrollController, dismissGestureLocker),
+          isDismissGesture: (event) => _isDismissGesture<T>(context, route, event, scrollController, dismissGestureLocker),
           isOverscrollAllowed: (event) => _isDismissOnOverscrollAllowed(route, event, scrollController),
           onStartDismissGesture: () => _startDismissGesture<T>(route, dismissGestureLocker),
           child: child,
@@ -289,6 +291,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
   }
 
   static DismissGesture _isDismissGesture<T>(
+      BuildContext context,
       PageRoute<T> route,
       PointerDownEvent event,
       ScrollController scrollController,
@@ -303,7 +306,8 @@ class PanelPageRoute<T> extends PageRoute<T> {
     }
 
     try {
-      if (scrollController.offset <= 0) {
+      final scrollZoneHeight = MediaQuery.of(context).size.height - _safeZoneHeight;
+      if (event.position.dy <= scrollZoneHeight && scrollController.offset <= 0) {
         return DismissGesture.overscroll;
       }
     } catch (e) {
