@@ -271,7 +271,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
         // match finger motions.
         linearTransition: isDismissGestureInProgress(route),
         child: _PanelDismissGestureDetector<T>(
-          isDismissGesture: (event) => _isDismissGesture<T>(route, event, scrollController),
+          isDismissGesture: (event) => _isDismissGesture<T>(context, route, event, scrollController),
           isOverscrollAllowed: (event) => _isDismissOnOverscrollAllowed(route, event, scrollController),
           onStartDismissGesture: () => _startDismissGesture<T>(route),
           child: child,
@@ -281,7 +281,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
     }
   }
 
-  static DismissGesture _isDismissGesture<T>(PageRoute<T> route, PointerDownEvent event, ScrollController scrollController) {
+  static DismissGesture _isDismissGesture<T>(BuildContext context, PageRoute<T> route, PointerDownEvent event, ScrollController scrollController) {
     if (!_isDismissGestureEnabled(route)) {
       return null;
     }
@@ -291,7 +291,8 @@ class PanelPageRoute<T> extends PageRoute<T> {
     }
 
     try {
-      if (scrollController.offset <= 0) {
+      final screenHeight = MediaQuery.of(context).size.height;
+      if (event.position.dy <= screenHeight * 0.75 && scrollController.offset <= 0) {
         return DismissGesture.overscroll;
       }
     } catch (e) {
