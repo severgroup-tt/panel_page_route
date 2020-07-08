@@ -68,6 +68,8 @@ final Animatable<Color> _kMiddleLeftTween = ColorTween(
 ///  * [CupertinoTabScaffold], for applications that have a tab bar at the
 ///    bottom with multiple pages.
 class PanelPageRoute<T> extends PageRoute<T> {
+  static const _safeZoneHeight = 50;
+
   /// Creates a page route for use in an iOS designed app.
   ///
   /// The [builder], [maintainState], and [fullscreenDialog] arguments must not
@@ -304,8 +306,8 @@ class PanelPageRoute<T> extends PageRoute<T> {
     }
 
     try {
-      final screenHeight = MediaQuery.of(context).size.height;
-      if (event.position.dy <= screenHeight * 0.9 && scrollController.offset <= 0) {
+      final scrollZoneHeight = MediaQuery.of(context).size.height - _safeZoneHeight;
+      if (event.position.dy <= scrollZoneHeight && scrollController.offset <= 0) {
         return DismissGesture.overscroll;
       }
     } catch (e) {
