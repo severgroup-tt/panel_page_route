@@ -7,15 +7,16 @@ library panelroute;
 import 'dart:math';
 import 'dart:ui' show lerpDouble;
 
+import 'package:flutter/animation.dart' show Curves;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
-import 'package:flutter/animation.dart' show Curves;
+import 'package:flutter/services.dart';
 
-typedef PanelWidgetBuilder = Widget Function(BuildContext, DelegatingScrollController);
+typedef PanelWidgetBuilder = Widget Function(BuildContext, DelegatingScrollController, DismissGestureLocker);
 
 const double dismissGestureHeight = 50.0;
 const double minFlingVelocity = 0.1; // Screen heights per second
@@ -80,7 +81,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
     bool fullscreenDialog = false,
     int scrollViewCount = 1,
     int defaultScrollView = 0,
-  }) : assert(builder != null),
+  })  : assert(builder != null),
         assert(maintainState != null),
         assert(fullscreenDialog != null),
         assert(opaque),
@@ -94,7 +95,9 @@ class PanelPageRoute<T> extends PageRoute<T> {
 
   final WidgetBuilder handleBuilder;
 
-  final ScrollController scrollController;
+  final DelegatingScrollController scrollController;
+
+  final dismissGestureLocker = DismissGestureLocker();
 
   @override
   final bool maintainState;
@@ -126,7 +129,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
   ///
   /// See also:
   ///
-  ///  * [popGestureEnabled], which returns true if a user-triggered pop gesture
+  ///  * [dismissGestureEnabled], which returns true if a user-triggered pop gesture
   ///    would be allowed.
   static bool isDismissGestureInProgress(PageRoute<dynamic> route) {
     return route.navigator.userGestureInProgress;
@@ -136,9 +139,9 @@ class PanelPageRoute<T> extends PageRoute<T> {
   ///
   /// See also:
   ///
-  ///  * [isPopGestureInProgress], which returns true if a Cupertino pop gesture
+  ///  * [isDismissGestureInProgress], which returns true if a Cupertino pop gesture
   ///    is currently underway for specific route.
-  ///  * [popGestureEnabled], which returns true if a user-triggered pop gesture
+  ///  * [dismissGestureEnabled], which returns true if a user-triggered pop gesture
   ///    would be allowed.
   bool get dismissGestureInProgress => isDismissGestureInProgress(this);
 
@@ -146,39 +149,36 @@ class PanelPageRoute<T> extends PageRoute<T> {
   ///
   /// Returns true if the user can edge-swipe to a previous route.
   ///
-  /// Returns false once [isPopGestureInProgress] is true, but
-  /// [isPopGestureInProgress] can only become true if [popGestureEnabled] was
+  /// Returns false once [isDismissGestureInProgress] is true, but
+  /// [isDismissGestureInProgress] can only become true if [dismissGestureEnabled] was
   /// true first.
   ///
   /// This should only be used between frames, not during build.
-  bool get dismissGestureEnabled => _isDismissGestureEnabled(this);
+  bool get dismissGestureEnabled => _isDismissGestureEnabled(this, dismissGestureLocker);
 
-  static bool _isDismissGestureEnabled<T>(PageRoute<T> route) {
+  static bool _isDismissGestureEnabled<T>(
+      PageRoute<T> route,
+      DismissGestureLocker dismissGestureLocker,
+      ) {
+    if (dismissGestureLocker.isDismissGestureLocked) return false;
     // We can close with swipe only popup
-    if (route is PanelPageRoute && !(route as PanelPageRoute).isPopup)
-      return false;
+    if (route is PanelPageRoute && !(route as PanelPageRoute).isPopup) return false;
     // If there's nothing to go back to, then obviously we don't support
     // the back gesture.
-    if (route.isFirst)
-      return false;
+    if (route.isFirst) return false;
     // If the route wouldn't actually pop if we popped it, then the gesture
     // would be really confusing (or would skip internal routes), so disallow it.
-    if (route.willHandlePopInternally)
-      return false;
+    if (route.willHandlePopInternally) return false;
     // Fullscreen dialogs aren't dismissible by back swipe.
-    if (route.fullscreenDialog)
-      return false;
+    if (route.fullscreenDialog) return false;
     // If we're in an animation already, we cannot be manually swiped.
-    if (route.animation.status != AnimationStatus.completed)
-      return false;
+    if (route.animation.status != AnimationStatus.completed) return false;
     // If we're being popped into, we also cannot be swiped until the pop above
     // it completes. This translates to our secondary animation being
     // dismissed.
-    if (route.secondaryAnimation.status != AnimationStatus.dismissed)
-      return false;
+    if (route.secondaryAnimation.status != AnimationStatus.dismissed) return false;
     // If we're in a gesture already, we cannot start another.
-    if (isDismissGestureInProgress(route))
-      return false;
+    if (isDismissGestureInProgress(route)) return false;
 
     // Looks like a back gesture would be welcome!
     return true;
@@ -186,29 +186,34 @@ class PanelPageRoute<T> extends PageRoute<T> {
 
   @override
   Widget buildPage(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation) {
-    final Widget child = isPopup
-      ? SafeArea(
-          bottom: false,
-          child: ClipRRect(
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
-            child: Stack(
-              children: [
-                builder(context, scrollController),
-                if (handleBuilder != null)
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    right: 0,
-                    child: handleBuilder(context),
-                  ),
-              ],
-            ),
+    final child = isPopup
+        ? AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarBrightness: Brightness.dark,
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: ClipRRect(
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
           ),
-        )
-      : builder(context, scrollController);
+          child: Stack(
+            children: [
+              builder(context, scrollController, dismissGestureLocker),
+              if (handleBuilder != null)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  right: 0,
+                  child: handleBuilder(context),
+                ),
+            ],
+          ),
+        ),
+      ),
+    )
+        : builder(context, scrollController, dismissGestureLocker);
 
     final Widget result = Semantics(
       scopesRoute: true,
@@ -230,8 +235,8 @@ class PanelPageRoute<T> extends PageRoute<T> {
   // Called by _CupertinoBackGestureDetector when a pop ("back") drag start
   // gesture is detected. The returned controller handles all of the subsequent
   // drag events.
-  static _PanelDismissGestureController<T> _startDismissGesture<T>(PageRoute<T> route) {
-    assert(_isDismissGestureEnabled(route));
+  static _PanelDismissGestureController<T> _startDismissGesture<T>(PageRoute<T> route, DismissGestureLocker dismissGestureLocker) {
+    assert(_isDismissGestureEnabled(route, dismissGestureLocker));
 
     return _PanelDismissGestureController<T>(
       navigator: route.navigator,
@@ -253,11 +258,13 @@ class PanelPageRoute<T> extends PageRoute<T> {
       Animation<double> secondaryAnimation,
       Widget child,
       ScrollController scrollController,
+      DismissGestureLocker dismissGestureLocker,
       ) {
-
     if (route.fullscreenDialog) {
       return CupertinoFullscreenDialogTransition(
-        animation: animation,
+        primaryRouteAnimation: animation,
+        secondaryRouteAnimation: animation,
+        linearTransition: true,
         child: child,
       );
     } else {
@@ -271,9 +278,9 @@ class PanelPageRoute<T> extends PageRoute<T> {
         // match finger motions.
         linearTransition: isDismissGestureInProgress(route),
         child: _PanelDismissGestureDetector<T>(
-          isDismissGesture: (event) => _isDismissGesture<T>(context, route, event, scrollController),
+          isDismissGesture: (event) => _isDismissGesture<T>(context, route, event, scrollController, dismissGestureLocker),
           isOverscrollAllowed: (event) => _isDismissOnOverscrollAllowed(route, event, scrollController),
-          onStartDismissGesture: () => _startDismissGesture<T>(route),
+          onStartDismissGesture: () => _startDismissGesture<T>(route, dismissGestureLocker),
           child: child,
           scrollController: scrollController,
         ),
@@ -281,8 +288,14 @@ class PanelPageRoute<T> extends PageRoute<T> {
     }
   }
 
-  static DismissGesture _isDismissGesture<T>(BuildContext context, PageRoute<T> route, PointerDownEvent event, ScrollController scrollController) {
-    if (!_isDismissGestureEnabled(route)) {
+  static DismissGesture _isDismissGesture<T>(
+      BuildContext context,
+      PageRoute<T> route,
+      PointerDownEvent event,
+      ScrollController scrollController,
+      DismissGestureLocker dismissGestureLocker,
+      ) {
+    if (!_isDismissGestureEnabled(route, dismissGestureLocker)) {
       return null;
     }
 
@@ -316,7 +329,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
 
   @override
   Widget buildTransitions(BuildContext context, Animation<double> animation, Animation<double> secondaryAnimation, Widget child) {
-    return buildPageTransitions<T>(this, context, animation, secondaryAnimation, child, scrollController);
+    return buildPageTransitions<T>(this, context, animation, secondaryAnimation, child, scrollController, dismissGestureLocker);
   }
 
   @override
@@ -338,25 +351,23 @@ class PanelPageTransition extends StatelessWidget {
     @required Animation<double> secondaryRouteAnimation,
     @required this.child,
     @required bool linearTransition,
-  }) : assert(linearTransition != null),
-        _primaryPositionAnimation =
-          (linearTransition
-              ? primaryRouteAnimation
-              : CurvedAnimation(
-                  parent: primaryRouteAnimation,
-                  curve: Curves.linearToEaseOut,
-                  reverseCurve: Curves.easeInToLinear,
-                )
-          ).drive(_kRightMiddleTween),
-        _secondaryPositionAnimation =
-          (linearTransition
-              ? secondaryRouteAnimation
-              : CurvedAnimation(
-                  parent: secondaryRouteAnimation,
-                  curve: Curves.linearToEaseOut,
-                  reverseCurve: Curves.easeInToLinear,
-                )
-          ).drive(_kMiddleLeftTween),
+  })  : assert(linearTransition != null),
+        _primaryPositionAnimation = (linearTransition
+            ? primaryRouteAnimation
+            : CurvedAnimation(
+          parent: primaryRouteAnimation,
+          curve: Curves.linearToEaseOut,
+          reverseCurve: Curves.easeInToLinear,
+        ))
+            .drive(_kRightMiddleTween),
+        _secondaryPositionAnimation = (linearTransition
+            ? secondaryRouteAnimation
+            : CurvedAnimation(
+          parent: secondaryRouteAnimation,
+          curve: Curves.linearToEaseOut,
+          reverseCurve: Curves.easeInToLinear,
+        ))
+            .drive(_kMiddleLeftTween),
         super(key: key);
 
   // When this page is coming in to cover another page.
@@ -370,7 +381,7 @@ class PanelPageTransition extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     assert(debugCheckHasDirectionality(context));
-    final TextDirection textDirection = Directionality.of(context);
+    final textDirection = Directionality.of(context);
     return ColorFiltered(
       colorFilter: ColorFilter.mode(_secondaryPositionAnimation.value, BlendMode.srcOver),
       child: SlideTransition(
@@ -381,8 +392,6 @@ class PanelPageTransition extends StatelessWidget {
     );
   }
 }
-
-
 
 /// This is the widget side of [_PanelDismissGestureController].
 ///
@@ -403,7 +412,7 @@ class _PanelDismissGestureDetector<T> extends StatefulWidget {
     @required this.onStartDismissGesture,
     @required this.child,
     this.scrollController,
-  }) : assert(isDismissGesture != null),
+  })  : assert(isDismissGesture != null),
         assert(isOverscrollAllowed != null),
         assert(onStartDismissGesture != null),
         assert(child != null),
@@ -505,9 +514,6 @@ class _PanelDismissOnTopGestureDetectorState<T> extends State<_PanelDismissGestu
   @override
   Widget build(BuildContext context) {
     assert(debugCheckHasDirectionality(context));
-    // For devices with notches, the drag area needs to be larger on the side
-    // that has the notch.
-    final double dragAreaHeight = MediaQuery.of(context).padding.top + dismissGestureHeight;
     return Stack(
       fit: StackFit.passthrough,
       children: <Widget>[
@@ -539,7 +545,7 @@ class _PanelDismissGestureController<T> {
   _PanelDismissGestureController({
     @required this.navigator,
     @required this.controller,
-  }) : assert(navigator != null),
+  })  : assert(navigator != null),
         assert(controller != null) {
     navigator.didStartUserGesture();
   }
@@ -547,14 +553,14 @@ class _PanelDismissGestureController<T> {
   final AnimationController controller;
   final NavigatorState navigator;
 
-  /// The drag gesture has changed by [fractionalDelta]. The total range of the
+  /// The drag gesture has changed by [delta]. The total range of the
   /// drag should be 0.0 to 1.0.
   void dragUpdate(double delta) {
     controller.value -= delta;
   }
 
   /// The drag gesture has ended with a vertical motion of
-  /// [fractionalVelocity] as a fraction of screen heights per second.
+  /// [velocity] as a fraction of screen heights per second.
   void dragEnd(double velocity) {
     // Fling in the appropriate direction.
     // AnimationController.fling is guaranteed to
@@ -578,7 +584,7 @@ class _PanelDismissGestureController<T> {
       // The closer the panel is to dismissing, the shorter the animation is.
       // We want to cap the animation time, but we want to use a linear curve
       // to determine it.
-      final int droppedPageForwardAnimationTime = min(
+      final droppedPageForwardAnimationTime = min(
         lerpDouble(maxDroppedSwipePageForwardAnimationTime, 0, controller.value).floor(),
         maxPageBackAnimationTime,
       );
@@ -590,7 +596,7 @@ class _PanelDismissGestureController<T> {
       // The popping may have finished inline if already at the target destination.
       if (controller.isAnimating) {
         // Otherwise, use a custom popping animation duration and curve.
-        final int droppedPageBackAnimationTime = lerpDouble(0, maxDroppedSwipePageForwardAnimationTime, controller.value).floor();
+        final droppedPageBackAnimationTime = lerpDouble(0, maxDroppedSwipePageForwardAnimationTime, controller.value).floor();
         controller.animateBack(0.0, duration: Duration(milliseconds: droppedPageBackAnimationTime), curve: animationCurve);
       }
     }
@@ -600,7 +606,7 @@ class _PanelDismissGestureController<T> {
       // curve of the page transition mid-flight since CupertinoPageTransition
       // depends on userGestureInProgress.
       AnimationStatusListener animationStatusCallback;
-      animationStatusCallback = (AnimationStatus status) {
+      animationStatusCallback = (status) {
         navigator.didStopUserGesture();
         controller.removeStatusListener(animationStatusCallback);
       };
@@ -619,14 +625,13 @@ class DelegatingScrollController implements ScrollController {
 
   ScrollController _currentDelegate;
 
-  DelegatingScrollController(int scrollViewCount, {int defaultScrollView = 0})
-      : _delegates = [for (int i = 0; i < scrollViewCount; i++) ScrollController()] {
+  DelegatingScrollController(int scrollViewCount, {int defaultScrollView = 0}) : _delegates = [for (int i = 0; i < scrollViewCount; i++) ScrollController()] {
     _currentDelegate = _delegates[defaultScrollView];
   }
 
   void delegateTo(int i) {
     _listeners.forEach((listener) => _currentDelegate.removeListener(listener));
-    this._currentDelegate = _delegates[i];
+    _currentDelegate = _delegates[i];
     _listeners.forEach((listener) => _currentDelegate.addListener(listener));
   }
 
@@ -666,7 +671,7 @@ class DelegatingScrollController implements ScrollController {
   }
 
   @override
-  Future<Function> animateTo(double offset, {@required Duration duration, @required Curve curve}) {
+  Future<void> animateTo(double offset, {@required Duration duration, @required Curve curve}) {
     return _currentDelegate.animateTo(offset, duration: duration, curve: curve);
   }
 
@@ -722,4 +727,8 @@ class DelegatingScrollController implements ScrollController {
   }
 
   ScrollController delegate(int i) => _delegates[i];
+}
+
+class DismissGestureLocker {
+  bool isDismissGestureLocked = false;
 }
