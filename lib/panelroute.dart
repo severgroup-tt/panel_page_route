@@ -305,7 +305,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
 
     try {
       final screenHeight = MediaQuery.of(context).size.height;
-      if (event.position.dy <= screenHeight * 0.75 && scrollController.offset <= 0) {
+      if (event.position.dy <= screenHeight * 0.9 && scrollController.offset <= 0) {
         return DismissGesture.overscroll;
       }
     } catch (e) {
