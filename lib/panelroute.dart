@@ -319,7 +319,7 @@ class PanelPageRoute<T> extends PageRoute<T> {
 
   static bool _isDismissOnOverscrollAllowed<T>(PageRoute<T> route, PointerMoveEvent event, ScrollController scrollController) {
     try {
-      if (event.delta.dy > 0 && scrollController.offset <= 0) {
+      if (event.delta.dy >= 0 && scrollController.offset <= 0) {
         return true;
       }
     } catch (e) {
