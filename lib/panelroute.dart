@@ -632,15 +632,18 @@ class DelegatingScrollController implements ScrollController {
 
   void delegateTo(int index) {
     _listeners.forEach((listener) => _currentDelegate.removeListener(listener));
+    _currentDelegate = delegate(index);
+    _listeners.forEach((listener) => _currentDelegate.addListener(listener));
+  }
 
+  ScrollController delegate(int index) {
     if (index >= _delegates.length) {
       for (var i = _delegates.length; i <= index; i++) {
         _delegates.add(ScrollController());
       }
     }
-
-    _currentDelegate = _delegates[index];
-    _listeners.forEach((listener) => _currentDelegate.addListener(listener));
+    
+    return _delegates[index];
   }
 
   @override
@@ -733,8 +736,6 @@ class DelegatingScrollController implements ScrollController {
     _listeners.remove(listener);
     _currentDelegate.removeListener(listener);
   }
-
-  ScrollController delegate(int i) => _delegates[i];
 }
 
 class DismissGestureLocker {
