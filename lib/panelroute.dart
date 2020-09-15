@@ -639,7 +639,7 @@ class DelegatingScrollController implements ScrollController {
       }
     }
 
-    _currentDelegate = _delegates[i];
+    _currentDelegate = _delegates[index];
     _listeners.forEach((listener) => _currentDelegate.addListener(listener));
   }
 
