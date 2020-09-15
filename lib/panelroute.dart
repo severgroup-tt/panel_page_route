@@ -622,18 +622,21 @@ class _PanelDismissGestureController<T> {
 enum DismissGesture { handle, overscroll }
 
 class DelegatingScrollController implements ScrollController {
-  final List<ScrollController> _delegates;
+  final _delegates = <ScrollController>[ScrollController()];
   final List<VoidCallback> _listeners = [];
 
-  ScrollController _currentDelegate;
+  ScrollController _currentDelegate = _delegates.first;
 
-  DelegatingScrollController(int scrollViewCount, {int defaultScrollView = 0}) : _delegates = [for (int i = 0; i < scrollViewCount; i++) ScrollController()] {
-    _currentDelegate = _delegates[defaultScrollView];
-  }
-
-  void delegateTo(int i) {
+  void delegateTo(int index) {
     _listeners.forEach((listener) => _currentDelegate.removeListener(listener));
-    _currentDelegate = _delegates[i];
+
+    if (index >= _delegates.length) {
+      for (var i = _delegates.length; i <= index; i++) {
+        _delegates.add(ScrollController());
+      }
+    }
+
+    _currentDelegate = _delegates[index];
     _listeners.forEach((listener) => _currentDelegate.addListener(listener));
   }
 
