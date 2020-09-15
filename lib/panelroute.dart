@@ -622,10 +622,14 @@ class _PanelDismissGestureController<T> {
 enum DismissGesture { handle, overscroll }
 
 class DelegatingScrollController implements ScrollController {
-  final _delegates = <ScrollController>[ScrollController()];
+  final List<ScrollController> _delegates;
   final List<VoidCallback> _listeners = [];
 
-  ScrollController _currentDelegate = _delegates.first;
+  ScrollController _currentDelegate;
+
+  DelegatingScrollController({int defaultScrollView = 0}) : _delegates = [for (int i = 0; i <= defaultScrollView; i++) ScrollController()] {
+    _currentDelegate = _delegates[defaultScrollView];
+  }
 
   void delegateTo(int index) {
     _listeners.forEach((listener) => _currentDelegate.removeListener(listener));
@@ -635,8 +639,8 @@ class DelegatingScrollController implements ScrollController {
         _delegates.add(ScrollController());
       }
     }
-
-    _currentDelegate = _delegates[index];
+    
+    _currentDelegate = _delegates[i];
     _listeners.forEach((listener) => _currentDelegate.addListener(listener));
   }
 
