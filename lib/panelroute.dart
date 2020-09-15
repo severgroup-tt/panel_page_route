@@ -81,13 +81,12 @@ class PanelPageRoute<T> extends PageRoute<T> {
     RouteSettings settings,
     this.maintainState = true,
     bool fullscreenDialog = false,
-    int scrollViewCount = 1,
     int defaultScrollView = 0,
   })  : assert(builder != null),
         assert(maintainState != null),
         assert(fullscreenDialog != null),
         assert(opaque),
-        scrollController = DelegatingScrollController(scrollViewCount, defaultScrollView: defaultScrollView),
+        scrollController = DelegatingScrollController(defaultScrollView: defaultScrollView),
         super(settings: settings, fullscreenDialog: fullscreenDialog);
 
   /// Builds the primary contents of the route.
@@ -639,7 +638,7 @@ class DelegatingScrollController implements ScrollController {
         _delegates.add(ScrollController());
       }
     }
-    
+
     _currentDelegate = _delegates[i];
     _listeners.forEach((listener) => _currentDelegate.addListener(listener));
   }
