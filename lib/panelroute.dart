@@ -81,13 +81,12 @@ class PanelPageRoute<T> extends PageRoute<T> {
     RouteSettings settings,
     this.maintainState = true,
     bool fullscreenDialog = false,
-    int scrollViewCount = 1,
     int defaultScrollView = 0,
   })  : assert(builder != null),
         assert(maintainState != null),
         assert(fullscreenDialog != null),
         assert(opaque),
-        scrollController = DelegatingScrollController(scrollViewCount, defaultScrollView: defaultScrollView),
+        scrollController = DelegatingScrollController(defaultScrollView: defaultScrollView),
         super(settings: settings, fullscreenDialog: fullscreenDialog);
 
   /// Builds the primary contents of the route.
@@ -627,14 +626,24 @@ class DelegatingScrollController implements ScrollController {
 
   ScrollController _currentDelegate;
 
-  DelegatingScrollController(int scrollViewCount, {int defaultScrollView = 0}) : _delegates = [for (int i = 0; i < scrollViewCount; i++) ScrollController()] {
+  DelegatingScrollController({int defaultScrollView = 0}) : _delegates = [for (int i = 0; i <= defaultScrollView; i++) ScrollController()] {
     _currentDelegate = _delegates[defaultScrollView];
   }
 
-  void delegateTo(int i) {
+  void delegateTo(int index) {
     _listeners.forEach((listener) => _currentDelegate.removeListener(listener));
-    _currentDelegate = _delegates[i];
+    _currentDelegate = delegate(index);
     _listeners.forEach((listener) => _currentDelegate.addListener(listener));
+  }
+
+  ScrollController delegate(int index) {
+    if (index >= _delegates.length) {
+      for (var i = _delegates.length; i <= index; i++) {
+        _delegates.add(ScrollController());
+      }
+    }
+    
+    return _delegates[index];
   }
 
   @override
@@ -727,8 +736,6 @@ class DelegatingScrollController implements ScrollController {
     _listeners.remove(listener);
     _currentDelegate.removeListener(listener);
   }
-
-  ScrollController delegate(int i) => _delegates[i];
 }
 
 class DismissGestureLocker {
